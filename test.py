@@ -6,8 +6,8 @@ from lib import cons
 from lib import aes
 
 token = ""  # paste your token
-userid = ""  # paste your user id
-data = {"method": "account.getAppPermissions", "token": token, "params": {"user_id": userid}}
+userid = "210700286"  # paste your user id
+data = {"method": "users.get", "token": token, "params": {"user_ids": userid}}
 cipher = aes.AESModeOfOperation()
 mode, orig_len, ciph = cipher.encrypt(json.dumps(data), cipher.modeOfOperation["OFB"], cons.CKEY,
                                       cipher.aes.keySize["SIZE_256"], cons.IV)
