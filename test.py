@@ -6,7 +6,7 @@ from lib import cons
 from lib import aes
 
 token = ""  # paste your token
-userid = ""  # paster your user id
+userid = ""  # paste your user id
 data = {"method": "account.getAppPermissions", "token": token, "params": {"user_id": userid}}
 cipher = aes.AESModeOfOperation()
 mode, orig_len, ciph = cipher.encrypt(json.dumps(data), cipher.modeOfOperation["OFB"], cons.CKEY,
