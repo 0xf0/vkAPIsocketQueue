@@ -1,14 +1,15 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import json
+import logging
+import socket
 import ssl
 import sys
-import json
-import socket
-import logging
-from time import sleep
-from threading import Thread
 from queue import Queue
+from threading import Thread
+from time import sleep
+
 from core import cons
 from core import vk
 
@@ -78,6 +79,7 @@ if __name__ == '__main__':
         try:
             cs, addr = sock.accept()
         except KeyboardInterrupt:
+            t.join()
             sys.exit(1)
         cs.settimeout(cons.FTIMEOUT)
         logging.info("{addr} opened".format(addr=addr))
