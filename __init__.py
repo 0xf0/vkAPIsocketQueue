@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import ssl
+import sys
+import json
 import socket
 import logging
-import json
-import sys
 from time import sleep
 from threading import Thread
 from queue import Queue
@@ -25,25 +25,32 @@ def handler(_cs, _addr):
     global q
     try:
         data = _cs.recv(cons.BUFF).decode("utf-8")
-        j = json.loads(data)
+        try:
+            j = json.loads(data)
+        except ValueError:
+            logging.warning("{addr} failed to load json".format(addr=_addr))
+            logging.debug("{addr} {json}".format(addr=_addr, json=j))
         if valid_json(j):
-            q.put((j, _cs))
-        else:
-            pass
+            q.put((j, _cs, _addr))
     except socket.timeout:
         logging.warning("{addr} timeout".format(addr=_addr))
     except json.decoder.JSONDecodeError:
         logging.warning("{addr} not a json data".format(addr=_addr))
-    logging.info("{addr} closed".format(addr=_addr))
 
 
 def worker():
     while True:
-        item, _cs = q.get()
+        item, _cs, _addr = q.get()
         api = vk.API(token=item["token"])
         exc = getattr(api, item["method"])(**item["params"])
-        _cs.send(json.dumps(exc).encode())
-        _cs.close()
+        try:
+            _cs.send(json.dumps(exc).encode())
+            if _cs:
+                logging.info("{addr} closed".format(addr=_addr))
+                _cs.close()
+        except ConnectionResetError:
+            logging.warning("{addr} connection reset".format(addr=_addr))
+
         sleep(cons.VTIMEOUT)
         q.task_done()
 
@@ -68,7 +75,10 @@ if __name__ == '__main__':
     t.start()
 
     while 1:
-        cs, addr = sock.accept()
+        try:
+            cs, addr = sock.accept()
+        except KeyboardInterrupt:
+            sys.exit(1)
         cs.settimeout(cons.FTIMEOUT)
         logging.info("{addr} opened".format(addr=addr))
         try:
