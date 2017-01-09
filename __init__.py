@@ -1,15 +1,16 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import ssl
 import socket
 import logging
 import json
+import sys
 from time import sleep
 from threading import Thread
 from queue import Queue
-from lib import cons
-from lib import aes
-from lib import vk
+from core import cons
+from core import vk
 
 
 # check json data from client
@@ -23,12 +24,8 @@ def valid_json(j):
 def handler(_cs, _addr):
     global q
     try:
-        data = _cs.recv(cons.BUFF)
-        sdata = data.decode("utf-8").split(" ")
-        ldata = ([int(x) for x in sdata])
-        decr = cipher.decrypt(ldata, False, cipher.modeOfOperation["OFB"], cons.CKEY,
-                              cipher.aes.keySize["SIZE_256"], cons.IV)
-        j = json.loads(decr)
+        data = _cs.recv(cons.BUFF).decode("utf-8")
+        j = json.loads(data)
         if valid_json(j):
             q.put((j, _cs))
         else:
@@ -45,9 +42,7 @@ def worker():
         item, _cs = q.get()
         api = vk.API(token=item["token"])
         exc = getattr(api, item["method"])(**item["params"])
-        mode, orig_len, ciph = cipher.encrypt(json.dumps(exc), cipher.modeOfOperation["OFB"], cons.CKEY,
-                                              cipher.aes.keySize["SIZE_256"], cons.IV)
-        _cs.send(" ".join(str(x) for x in ciph).encode())
+        _cs.send(json.dumps(exc).encode())
         _cs.close()
         sleep(cons.VTIMEOUT)
         q.task_done()
@@ -67,9 +62,6 @@ if __name__ == '__main__':
     sock.bind(("", cons.LISTEN_PORT))
     sock.listen(cons.MAX_CONN)
 
-    # cipher
-    cipher = aes.AESModeOfOperation()
-
     # command list queue
     q = Queue()
     t = Thread(target=worker)
@@ -79,7 +71,12 @@ if __name__ == '__main__':
         cs, addr = sock.accept()
         cs.settimeout(cons.FTIMEOUT)
         logging.info("{addr} opened".format(addr=addr))
-        t = Thread(target=handler, args=(cs, addr,))
+        try:
+            ssl_wrap = ssl.wrap_socket(cs, keyfile=cons.SSL_KEY, certfile=cons.SSL_CRT, server_side=True)
+        except Exception as e:
+            logging.critical("exception: {e}".format(e=e))
+            sys.exit(1)
+        t = Thread(target=handler, args=(ssl_wrap, addr,))
         t.start()
         q.join()
         t.join()
